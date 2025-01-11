@@ -51,19 +51,25 @@ void DeleteDirectory(const std::wstring& directoryPath)
 
 int main()
 {
-    std::wstring tempPath = L"C:\\Users\\znaha\\AppData\\Local\\Temp";
+    // Get the path to the current user's temp folder
+    wchar_t tempPath[MAX_PATH];
+    if (!GetTempPath(MAX_PATH, tempPath))
+    {
+        std::cerr << "Failed to get temp path!" << std::endl;
+        return 1;
+    }
+
+    std::wcout << L"Temp directory: " << tempPath << std::endl;
 
     DeleteDirectory(tempPath);
 
+    // Empty the recycle bin
     SHEmptyRecycleBin(NULL, NULL, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
     std::cout << "\n\n\n\n\n Cleaning Completed! \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
     std::cout << " Simple 1 Click Temp & Bin cleaner made by Ladro \n\n" << " If you have any request consider contacting me at: ladrozje@gmail.com";
     std::cout << "\n\n\n\n\n\n";
-    std::cout << "Press any key to close." << std::endl;
+    std::cout << "Press Enter to exit." << std::endl;
     getchar();
 
     return 0;
-
-
-
 }
