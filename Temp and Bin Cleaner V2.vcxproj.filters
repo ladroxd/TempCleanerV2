@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Temp and Bin Cleaner V2.cpp">
+    <ClCompile Include="Main_temp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
