@@ -45,4 +45,4 @@ Simply open the solution file (`.sln`) in Visual Studio and build.
 ## Contact
 
 Made by Ladro
-Email: ladrozje@gmail.com
+Email: znahairy@gmail.com
