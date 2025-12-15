@@ -115,10 +115,10 @@ void CleanDirectory(const std::wstring& path, const std::wstring& name)
 
 int main()
 {
-    std::cout << "==================================================" << std::endl;
-    std::cout << "  Temp and Bin Cleaner V2 - Universal Edition" << std::endl;
-    std::cout << "==================================================" << std::endl;
-    std::cout << "\nStarting cleanup process...\n" << std::endl;
+    std::wcout << L"==================================================" << std::endl;
+    std::wcout << L"  Temp and Bin Cleaner V2 - Universal Edition" << std::endl;
+    std::wcout << L"==================================================" << std::endl;
+    std::wcout << L"\nStarting cleanup process...\n" << std::endl;
 
     // Get the path to the current user's temp folder
     wchar_t tempPath[MAX_PATH];
@@ -134,7 +134,7 @@ int main()
     }
     else
     {
-        std::cerr << "Failed to get user temp path!" << std::endl;
+        std::wcerr << L"Failed to get user temp path!" << std::endl;
     }
 
     // Get Windows directory and clean Windows\Temp
@@ -150,29 +150,29 @@ int main()
     }
     else
     {
-        std::cerr << "Failed to get Windows directory path!" << std::endl;
+        std::wcerr << L"Failed to get Windows directory path!" << std::endl;
     }
 
     // Empty the recycle bin
-    std::cout << "\nEmptying Recycle Bin..." << std::endl;
+    std::wcout << L"\nEmptying Recycle Bin..." << std::endl;
     HRESULT result = SHEmptyRecycleBin(NULL, NULL, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
     if (SUCCEEDED(result))
     {
-        std::cout << "Recycle Bin emptied successfully!" << std::endl;
+        std::wcout << L"Recycle Bin emptied successfully!" << std::endl;
     }
     else
     {
-        std::cout << "Failed to empty Recycle Bin (may already be empty or require admin rights)" << std::endl;
+        std::wcout << L"Failed to empty Recycle Bin (may already be empty or require admin rights)" << std::endl;
     }
 
-    std::cout << "\n\n==================================================" << std::endl;
-    std::cout << "             Cleaning Completed!" << std::endl;
-    std::cout << "==================================================" << std::endl;
-    std::cout << "\n Simple 1 Click Temp & Bin cleaner made by Ladro" << std::endl;
-    std::cout << " If you have any request consider contacting me at: ladrozje@gmail.com" << std::endl;
-    std::cout << "\n NOTE: This cleaner works on any Windows PC." << std::endl;
-    std::cout << " Some folders may require administrator rights to clean." << std::endl;
-    std::cout << "\n\nPress Enter to exit." << std::endl;
+    std::wcout << L"\n\n==================================================" << std::endl;
+    std::wcout << L"             Cleaning Completed!" << std::endl;
+    std::wcout << L"==================================================" << std::endl;
+    std::wcout << L"\n Simple 1 Click Temp & Bin cleaner made by Ladro" << std::endl;
+    std::wcout << L" If you have any request consider contacting me at: ladrozje@gmail.com" << std::endl;
+    std::wcout << L"\n NOTE: This cleaner works on any Windows PC." << std::endl;
+    std::wcout << L" Some folders may require administrator rights to clean." << std::endl;
+    std::wcout << L"\n\nPress Enter to exit." << std::endl;
     getchar();
 
     return 0;
