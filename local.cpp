@@ -39,10 +39,13 @@ static bool IsRunningAsAdmin() {
 #define BG_COLOR  RGB(245, 246, 250)
 #define ACCENT    RGB(50, 120, 220)
 
-static HWND g_hWnd    = NULL;
-static HWND g_hLog    = NULL;
-static HWND g_hBtn    = NULL;
-static HWND g_hStatus = NULL;
+static HINSTANCE g_hInst  = NULL;
+static HWND g_hWnd        = NULL;
+static HWND g_hLog        = NULL;
+static HWND g_hBtn        = NULL;
+static HWND g_hStatus     = NULL;
+static HWND g_hIconCtrl   = NULL;
+static HWND g_hTitleLbl   = NULL;
 static std::atomic<bool> g_cleaning(false);
 static LONG g_filesDeleted = 0;
 static LONG g_errors = 0;
@@ -150,32 +153,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
-        CreateWindow(L"STATIC", L"Temp & Bin Cleaner",
-            WS_CHILD | WS_VISIBLE | SS_CENTER,
-            0, 18, 500, 34, hWnd, (HMENU)IDC_TITLE_LBL, NULL, NULL);
+        // Icon + title — positioned dynamically in WM_SIZE
+        g_hIconCtrl = CreateWindow(L"STATIC", L"",
+            WS_CHILD | WS_VISIBLE | SS_ICON | SS_REALSIZEIMAGE,
+            0, 0, 32, 32, hWnd, (HMENU)IDC_TITLE_LBL, NULL, NULL);
+        HICON hIco = (HICON)LoadImage(g_hInst, MAKEINTRESOURCE(IDI_ICON1),
+            IMAGE_ICON, 32, 32, LR_DEFAULTCOLOR);
+        SendMessage(g_hIconCtrl, STM_SETICON, (WPARAM)hIco, 0);
+
+        g_hTitleLbl = CreateWindow(L"STATIC", L"OptiCore Cleaner",
+            WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+            0, 0, 300, 34, hWnd, NULL, NULL, NULL);
 
         CreateWindow(L"STATIC", L"Simple 1-click cleaner by Ladro",
-            WS_CHILD | WS_VISIBLE | SS_CENTER,
-            0, 54, 500, 20, hWnd, (HMENU)IDC_SUBTITLE_LBL, NULL, NULL);
+            WS_CHILD | WS_VISIBLE | SS_LEFT | SS_NOPREFIX,
+            0, 54, 520, 20, hWnd, (HMENU)IDC_SUBTITLE_LBL, NULL, NULL);
 
         g_hLog = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_VSCROLL |
             ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
             20, 84, 460, 240, hWnd, (HMENU)IDC_LOG_EDIT, NULL, NULL);
 
-        g_hStatus = CreateWindow(L"STATIC", L"Ready. Press \"Clean Now\" to start.",
-            WS_CHILD | WS_VISIBLE | SS_CENTER,
-            20, 334, 460, 20, hWnd, (HMENU)IDC_STATUS_LBL, NULL, NULL);
-
         g_hBtn = CreateWindow(L"BUTTON", L"Clean Now",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
             175, 362, 150, 36, hWnd, (HMENU)IDC_CLEAN_BTN, NULL, NULL);
 
-        SendDlgItemMessage(hWnd, IDC_TITLE_LBL,    WM_SETFONT, (WPARAM)g_hFontTitle,  TRUE);
-        SendDlgItemMessage(hWnd, IDC_SUBTITLE_LBL,  WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
-        SendMessage(g_hLog,    WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
-        SendMessage(g_hStatus, WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
-        SendMessage(g_hBtn,    WM_SETFONT, (WPARAM)g_hFontBtn,    TRUE);
+        SendMessage(g_hTitleLbl,   WM_SETFONT, (WPARAM)g_hFontTitle,  TRUE);
+        SendDlgItemMessage(hWnd, IDC_SUBTITLE_LBL, WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
+        SendMessage(g_hLog,        WM_SETFONT, (WPARAM)g_hFontNormal, TRUE);
+        SendMessage(g_hBtn,        WM_SETFONT, (WPARAM)g_hFontBtn,    TRUE);
         break;
     }
 
@@ -211,7 +217,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_cleaning = true;
             EnableWindow(g_hBtn, FALSE);
             SetWindowText(g_hLog, L"");
-            SetWindowText(g_hStatus, L"Cleaning... please wait.");
+            AppendLog(L"Cleaning... please wait.");
             HANDLE hThread = CreateThread(NULL, 0, CleanThread, NULL, 0, NULL);
             if (hThread) CloseHandle(hThread);
         }
@@ -231,10 +237,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         g_cleaning = false;
         EnableWindow(g_hBtn, TRUE);
 
-        wchar_t status[128];
-        swprintf_s(status, L"Done!  %ld file(s) deleted,  %ld skipped.", g_filesDeleted, g_errors);
-        SetWindowText(g_hStatus, status);
-
         AppendLog(L"");
         AppendLog(L"============================");
         AppendLog(L"  Cleaning complete!");
@@ -247,11 +249,57 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         break;
     }
 
+    case WM_SIZE: {
+        int cw = LOWORD(lParam);
+        int ch = HIWORD(lParam);
+        const int margin = 20;
+        const int btnW = 150, btnH = 36;
+        const int bottomPad = 14;
+        const int iconW = 32, iconH = 32, gap = 8;
+        const int titleH = 34;
+
+        // measure title text width using the title font
+        SIZE textSz = {};
+        HDC hdc = GetDC(g_hTitleLbl);
+        HFONT hOld = (HFONT)SelectObject(hdc, g_hFontTitle);
+        GetTextExtentPoint32(hdc, L"OptiCore Cleaner", 16, &textSz);
+        SelectObject(hdc, hOld);
+        ReleaseDC(g_hTitleLbl, hdc);
+
+        // center the icon+gap+title group horizontally
+        int groupW = iconW + gap + textSz.cx;
+        int startX = (cw - groupW) / 2;
+        int iconY  = 14 + (titleH - iconH) / 2;
+        SetWindowPos(g_hIconCtrl,  NULL, startX, iconY, iconW, iconH, SWP_NOZORDER);
+        SetWindowPos(g_hTitleLbl,  NULL, startX + iconW + gap, 14, textSz.cx + 4, titleH, SWP_NOZORDER);
+
+        // measure and center subtitle
+        SIZE subSz = {};
+        HWND hSub = GetDlgItem(hWnd, IDC_SUBTITLE_LBL);
+        HDC hdcSub = GetDC(hSub);
+        HFONT hOldSub = (HFONT)SelectObject(hdcSub, g_hFontNormal);
+        GetTextExtentPoint32(hdcSub, L"Simple 1-click cleaner by Ladro", 31, &subSz);
+        SelectObject(hdcSub, hOldSub);
+        ReleaseDC(hSub, hdcSub);
+        SetWindowPos(hSub, NULL, (cw - subSz.cx) / 2, 54, subSz.cx + 4, 20, SWP_NOZORDER);
+
+        // button pinned to bottom center
+        int btnY = ch - bottomPad - btnH;
+        int btnX = (cw - btnW) / 2;
+        SetWindowPos(g_hBtn, NULL, btnX, btnY, btnW, btnH, SWP_NOZORDER);
+
+        // log fills space between subtitle and button
+        int logY = 84;
+        int logH = btnY - logY - 8;
+        SetWindowPos(g_hLog, NULL, margin, logY, cw - margin * 2, logH, SWP_NOZORDER);
+        break;
+    }
+
     case WM_CTLCOLORSTATIC: {
         HDC hdc = (HDC)wParam;
         SetBkColor(hdc, BG_COLOR);
         // Give the title a distinct color
-        if ((HWND)lParam == GetDlgItem(hWnd, IDC_TITLE_LBL))
+        if ((HWND)lParam == g_hTitleLbl)
             SetTextColor(hdc, ACCENT);
         else
             SetTextColor(hdc, RGB(50, 50, 60));
@@ -263,6 +311,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         GetClientRect(hWnd, &rc);
         FillRect((HDC)wParam, &rc, g_hBgBrush);
         return 1;
+    }
+
+    case WM_GETMINMAXINFO: {
+        MINMAXINFO* mmi = (MINMAXINFO*)lParam;
+        mmi->ptMinTrackSize.x = 400;
+        mmi->ptMinTrackSize.y = 350;
+        break;
     }
 
     case WM_DESTROY:
@@ -277,6 +332,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int nCmdShow) {
+    g_hInst = hInstance;
     INITCOMMONCONTROLSEX icc = { sizeof(icc), ICC_STANDARD_CLASSES };
     InitCommonControlsEx(&icc);
 
@@ -297,7 +353,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPSTR, _In
 
     g_hWnd = CreateWindowEx(0, L"TempBinCleanerV2",
         L"Temp & Bin Cleaner",
-        WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
+        WS_OVERLAPPEDWINDOW,
         (screenW - winW) / 2, (screenH - winH) / 2,
         winW, winH, NULL, NULL, hInstance, NULL);
 
